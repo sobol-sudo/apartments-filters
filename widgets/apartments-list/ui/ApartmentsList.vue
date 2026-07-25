@@ -9,7 +9,7 @@ const props = defineProps<{
 }>();
 
 const formatNumber = (value: number): string => {
-  return value.toLocaleString("ru-RU");
+  return value.toLocaleString("en-US");
 };
 </script>
 
@@ -30,16 +30,16 @@ const formatNumber = (value: number): string => {
         <p class="apartments-item__square">
           {{ formatNumber(item.square) }}
 
-          <span>м²</span>
+          <span>m²</span>
         </p>
 
         <p class="apartments-item__floor">
           {{ item.floor }}
 
           <span>
-            из {{ TOTAL_FLOORS }}
+            of {{ TOTAL_FLOORS }}
 
-            <sub>этаж</sub>
+            <sub>floor</sub>
           </span>
         </p>
 
