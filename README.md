@@ -9,10 +9,37 @@ This project is a page with a catalog of apartments featuring filtering by vario
 
 ## Features
 
-- Display a list of apartments
-- Filter apartments by price, area, and other parameters
-- Smooth updates of the list when filters change
-- Slider component for selecting ranges (vue-3-slider-component)
+- Apartment listing with paging ("Load more"), rendered on the server
+- Filtering by bedroom count, price and area; sorting by any of the four data columns
+- Filters and sort order survive a reload, and are applied during SSR as well
+- Apartment detail page at `/apartments/:id`, deep-linkable, with a real 404
+- Explicit empty, error and no-data states, each with a way out
+
+---
+
+## How the filters are persisted
+
+Saved filters are kept in a cookie rather than in `localStorage`.
+
+The list is server-rendered, and the server can only see what the browser sends
+with the request. With `localStorage` a returning visitor is served the
+unfiltered catalogue and watches it change once hydration runs. A cookie is
+readable on both sides, so the server renders exactly what the client is about
+to render — no flash, no hydration mismatch.
+
+The cookie is user-editable, so it is treated as untrusted input: unknown shapes
+fall back to the defaults and out-of-bounds ranges are clamped, which means a
+corrupt value can never lock the page into a permanent empty state.
+
+---
+
+## Data
+
+`server/api/apartments` and `server/api/apartments/:id` are Nitro routes backed
+by a fixed dataset in `entities/apartment/mock`. During SSR Nuxt resolves them
+in-process, so a server render costs a function call rather than a round trip.
+Everything on screen — bedroom chips, the floor count, price per m² — is derived
+from that dataset; nothing is hard-coded to look fuller than the data is.
 
 ---
 
@@ -94,6 +121,12 @@ yarn preview
 
 # bun
 bun run preview
+```
+
+Type-check the whole project:
+
+```bash
+pnpm typecheck
 ```
 
 Check out the [deployment documentation](https://nuxt.com/docs/getting-started/deployment) for more information.

@@ -1,75 +1,31 @@
 import type { apartmentsItem } from "../types";
 import { getApartments } from "../api";
-import { safeStorage } from "~/shareds/lib/safe-storage";
+import { debounce } from "~/shareds/lib/debounce";
+import { useFiltersCookie } from "./persistence";
+import {
+  createDefaultFilters,
+  extractRoomsCount,
+  normalizePersistedFilters,
+  type FilterState,
+  type RoomOption,
+  type SortOption,
+} from "./filters";
 
-export const SORT_OPTIONS = [
-  "default",
-  "price_asc",
-  "price_desc",
-  "square_asc",
-  "square_desc",
-  "floor_asc",
-  "floor_desc",
-] as const;
-
-export type SortOption = (typeof SORT_OPTIONS)[number];
-
-export interface FilterState {
-  rooms: number[];
-  priceRange: [number, number];
-  squareRange: [number, number];
-}
-
-export interface RoomOption {
-  name: string;
-  value: number;
-  active: boolean;
-  disabled: boolean;
-}
-
-// Filter defaults
-export const DEFAULT_PRICE_MIN = 5500000;
-export const DEFAULT_PRICE_MAX = 18900000;
-export const DEFAULT_SQUARE_MIN = 33;
-export const DEFAULT_SQUARE_MAX = 123;
-export const PRICE_STEP = 100000;
 const ITEMS_PER_PAGE = 5;
-const LOAD_MORE_DELAY = 1000;
-const FILTERS_STORAGE_KEY = "apartments-filters";
-
-// Pulls the bedroom count out of an apartment title, e.g. "2-bedroom, unit 102" -> 2
-export const extractRoomsCount = (title: string): number => {
-  const match = title.match(/(\d+)-bedroom/);
-  return match ? parseInt(match[1], 10) : 0;
-};
-
-const isNumericRange = (value: unknown): value is [number, number] =>
-  Array.isArray(value) &&
-  value.length === 2 &&
-  value.every((entry) => typeof entry === "number" && Number.isFinite(entry));
-
-// Persisted state comes from localStorage, which anyone can edit by hand,
-// so validate its shape before letting it into the store
-const isFilterState = (value: unknown): value is FilterState => {
-  if (typeof value !== "object" || value === null) return false;
-
-  const candidate = value as Partial<FilterState>;
-
-  return (
-    Array.isArray(candidate.rooms) &&
-    candidate.rooms.every((room) => typeof room === "number") &&
-    isNumericRange(candidate.priceRange) &&
-    isNumericRange(candidate.squareRange)
-  );
-};
-
-const isSortOption = (value: unknown): value is SortOption =>
-  SORT_OPTIONS.includes(value as SortOption);
+// Slider drags are committed on a debounce so a drag does not refilter the list
+// on every frame.
+const FILTER_COMMIT_DELAY = 300;
 
 const toErrorMessage = (err: unknown): string =>
   err instanceof Error ? err.message : String(err);
 
 export const useApartmentsStore = defineStore("apartments", () => {
+  // Read on both sides of the render: on the server from the request cookie, in
+  // the browser from document.cookie. Both arrive at the same filter state, so
+  // the server-rendered markup already matches what hydration produces.
+  const persistedFilters = useFiltersCookie();
+  const restored = normalizePersistedFilters(persistedFilters.value);
+
   const allApartments = ref<apartmentsItem[]>([]);
   const displayedApartments = ref<apartmentsItem[]>([]);
   const filteredApartments = ref<apartmentsItem[]>([]);
@@ -79,93 +35,65 @@ export const useApartmentsStore = defineStore("apartments", () => {
   // Kept as a plain string: an Error instance cannot be serialized into the
   // Nuxt payload, which would turn a failed server-side fetch into a 500
   const error = ref<string | null>(null);
-  const sortBy = ref<SortOption>("default");
   const hasInitialized = ref(false);
 
-  const rooms = reactive<RoomOption[]>([
-    {
-      name: "1BR",
-      value: 1,
-      active: false,
-      disabled: false,
-    },
-    {
-      name: "2BR",
-      value: 2,
-      active: false,
-      disabled: false,
-    },
-    {
-      name: "3BR",
-      value: 3,
-      active: false,
-      disabled: false,
-    },
-    {
-      name: "4BR",
-      value: 4,
-      active: false,
-      disabled: true,
-    },
-  ]);
+  const filters = ref<FilterState>(restored?.filters ?? createDefaultFilters());
+  const sortBy = ref<SortOption>(restored?.sortBy ?? "default");
 
-  const filters = ref<FilterState>({
-    rooms: [],
-    priceRange: [DEFAULT_PRICE_MIN, DEFAULT_PRICE_MAX],
-    squareRange: [DEFAULT_SQUARE_MIN, DEFAULT_SQUARE_MAX],
-  });
+  // Chips are derived from the data instead of being hard-coded, so the sidebar
+  // can only ever offer bedroom counts the catalogue actually contains.
+  const rooms = computed<RoomOption[]>(() => {
+    const available = new Set<number>();
 
-  const initPersistedState = (): void => {
-    const saved = safeStorage.getItem(FILTERS_STORAGE_KEY);
-
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved);
-
-        if (isFilterState(parsed?.filters)) {
-          filters.value = parsed.filters;
-        }
-
-        sortBy.value = isSortOption(parsed?.sortBy) ? parsed.sortBy : "default";
-      } catch (e) {
-        console.warn("Failed to restore saved filters:", e);
-      }
-    }
-
-    // Chip state is always derived from the filters, restored or default, so a
-    // first-time visitor never sees a highlighted chip with no filter applied
-    rooms.forEach((room) => {
-      room.active = filters.value.rooms.includes(room.value);
+    allApartments.value.forEach((apartment) => {
+      const count = extractRoomsCount(apartment.title);
+      if (count > 0) available.add(count);
     });
-  };
 
-  const hasMoreItems = computed(() => {
-    return displayedApartments.value.length < filteredApartments.value.length;
+    return [...available]
+      .sort((a, b) => a - b)
+      .map((value) => ({
+        name: `${value}BR`,
+        value,
+        active: filters.value.rooms.includes(value),
+      }));
   });
 
-  const totalPages = computed(() => {
-    return Math.ceil(filteredApartments.value.length / itemsPerPage.value);
-  });
+  const totalFloors = computed(() =>
+    allApartments.value.reduce(
+      (highest, apartment) => Math.max(highest, apartment.floor),
+      0
+    )
+  );
 
-  const isEmpty = computed(() => {
-    return (
+  const hasMoreItems = computed(
+    () => displayedApartments.value.length < filteredApartments.value.length
+  );
+
+  const isEmpty = computed(
+    () =>
       hasInitialized.value &&
       !isLoading.value &&
       allApartments.value.length > 0 &&
       filteredApartments.value.length === 0
-    );
-  });
+  );
 
-  const hasNoData = computed(() => {
-    return !isLoading.value && allApartments.value.length === 0;
-  });
+  const hasNoData = computed(
+    () =>
+      hasInitialized.value &&
+      !isLoading.value &&
+      allApartments.value.length === 0
+  );
 
-  // Persist the current filters and sort order so they survive a page reload
-  const saveFilters = () => {
-    safeStorage.setItem(
-      FILTERS_STORAGE_KEY,
-      JSON.stringify({ filters: filters.value, sortBy: sortBy.value })
-    );
+  const saveFilters = (): void => {
+    persistedFilters.value = {
+      filters: {
+        rooms: [...filters.value.rooms],
+        priceRange: [...filters.value.priceRange],
+        squareRange: [...filters.value.squareRange],
+      },
+      sortBy: sortBy.value,
+    };
   };
 
   const sortMapper: Record<
@@ -173,6 +101,9 @@ export const useApartmentsStore = defineStore("apartments", () => {
     (a: apartmentsItem, b: apartmentsItem) => number
   > = {
     default: () => 0,
+    rooms_asc: (a, b) => extractRoomsCount(a.title) - extractRoomsCount(b.title),
+    rooms_desc: (a, b) =>
+      extractRoomsCount(b.title) - extractRoomsCount(a.title),
     price_asc: (a, b) => a.price - b.price,
     price_desc: (a, b) => b.price - a.price,
     square_asc: (a, b) => a.square - b.square,
@@ -181,21 +112,17 @@ export const useApartmentsStore = defineStore("apartments", () => {
     floor_desc: (a, b) => b.floor - a.floor,
   };
 
-  const filterApartments = (apartments: apartmentsItem[]): apartmentsItem[] => {
-    return apartments.filter((apartment) => {
+  const filterApartments = (apartments: apartmentsItem[]): apartmentsItem[] =>
+    apartments.filter((apartment) => {
       // Bedrooms
       if (filters.value.rooms.length > 0) {
         const roomsCount = extractRoomsCount(apartment.title);
-        if (!filters.value.rooms.includes(roomsCount)) {
-          return false;
-        }
+        if (!filters.value.rooms.includes(roomsCount)) return false;
       }
 
       // Price
       const [priceMin, priceMax] = filters.value.priceRange;
-      if (apartment.price < priceMin || apartment.price > priceMax) {
-        return false;
-      }
+      if (apartment.price < priceMin || apartment.price > priceMax) return false;
 
       // Area
       const [squareMin, squareMax] = filters.value.squareRange;
@@ -205,25 +132,20 @@ export const useApartmentsStore = defineStore("apartments", () => {
 
       return true;
     });
-  };
 
   const sortApartments = (
     apartments: apartmentsItem[],
     sortOption: SortOption
-  ): apartmentsItem[] => {
-    if (sortOption === "default") return [...apartments];
+  ): apartmentsItem[] =>
+    sortOption === "default"
+      ? [...apartments]
+      : [...apartments].sort(sortMapper[sortOption]);
 
-    const sortFn = sortMapper[sortOption];
-    return [...apartments].sort(sortFn);
-  };
-
-  const applyFiltersAndSort = () => {
-    if (allApartments.value.length === 0) return;
-
-    const filtered = filterApartments(allApartments.value);
-    const sorted = sortApartments(filtered, sortBy.value);
-
-    filteredApartments.value = sorted;
+  const applyFiltersAndSort = (): void => {
+    filteredApartments.value = sortApartments(
+      filterApartments(allApartments.value),
+      sortBy.value
+    );
     currentPage.value = 1;
     displayedApartments.value = filteredApartments.value.slice(
       0,
@@ -231,7 +153,24 @@ export const useApartmentsStore = defineStore("apartments", () => {
     );
   };
 
-  const fetchApartments = async () => {
+  // Deliberately argument-free: it re-reads the live filter state instead of
+  // closing over the values captured when the drag happened, so a queued commit
+  // can never write back a range the user has already moved on from.
+  const commitFilters = debounce(() => {
+    applyFiltersAndSort();
+    saveFilters();
+  }, FILTER_COMMIT_DELAY);
+
+  // Every action that applies filters straight away first drops whatever the
+  // sliders have queued. Without this a pending drag lands after a reset and
+  // silently undoes it, in the persisted copy as well as on screen.
+  const commitNow = (): void => {
+    commitFilters.cancel();
+    applyFiltersAndSort();
+    saveFilters();
+  };
+
+  const fetchApartments = async (): Promise<void> => {
     if (allApartments.value.length > 0) return;
 
     isLoading.value = true;
@@ -241,6 +180,17 @@ export const useApartmentsStore = defineStore("apartments", () => {
       const data = await getApartments();
       allApartments.value = data;
       hasInitialized.value = true;
+
+      // A saved bedroom filter can outlive the listing it referred to. Dropping
+      // counts the catalogue no longer has keeps the chips and the results in
+      // agreement instead of showing an empty list with nothing highlighted.
+      const available = new Set(
+        data.map((apartment) => extractRoomsCount(apartment.title))
+      );
+      filters.value.rooms = filters.value.rooms.filter((room) =>
+        available.has(room)
+      );
+
       applyFiltersAndSort();
     } catch (err) {
       error.value = toErrorMessage(err);
@@ -248,13 +198,6 @@ export const useApartmentsStore = defineStore("apartments", () => {
     } finally {
       isLoading.value = false;
     }
-  };
-
-  // Runs on the client only. The server has no localStorage, so it renders the
-  // full, unfiltered list and the saved selection is re-applied after hydration.
-  const restorePersistedFilters = (): void => {
-    initPersistedState();
-    applyFiltersAndSort();
   };
 
   // Clears the error so the error block can disappear. Data that already
@@ -272,84 +215,47 @@ export const useApartmentsStore = defineStore("apartments", () => {
     await fetchApartments();
   };
 
-  const loadMore = async (): Promise<void> => {
-    if (!hasMoreItems.value || isLoading.value) return;
+  // The whole catalogue is already in memory, so revealing the next page is a
+  // slice rather than a request.
+  const loadMore = (): void => {
+    if (!hasMoreItems.value) return;
 
-    isLoading.value = true;
-
-    try {
-      await new Promise((resolve) => setTimeout(resolve, LOAD_MORE_DELAY));
-
-      currentPage.value++;
-      const startIndex = 0;
-      const endIndex = currentPage.value * itemsPerPage.value;
-
-      displayedApartments.value = filteredApartments.value.slice(
-        startIndex,
-        endIndex
-      );
-    } catch (err) {
-      console.error("Failed to load more apartments:", err);
-      error.value = toErrorMessage(err);
-    } finally {
-      isLoading.value = false;
-    }
+    currentPage.value++;
+    displayedApartments.value = filteredApartments.value.slice(
+      0,
+      currentPage.value * itemsPerPage.value
+    );
   };
 
-  const setSortBy = (newSortBy: SortOption) => {
+  const findApartment = (id: number): apartmentsItem | undefined =>
+    allApartments.value.find((apartment) => apartment.id === id);
+
+  const setSortBy = (newSortBy: SortOption): void => {
     sortBy.value = newSortBy;
-    applyFiltersAndSort();
-    saveFilters();
+    commitNow();
   };
 
-  const setRoomsFilter = (rooms: number[]) => {
-    filters.value.rooms = rooms;
-    applyFiltersAndSort();
-    saveFilters();
+  const toggleRoom = (value: number): void => {
+    filters.value.rooms = filters.value.rooms.includes(value) ? [] : [value];
+    commitNow();
   };
 
-  const resetRooms = () => {
-    rooms.forEach((room) => (room.active = false));
+  // Slider input: reflect the new range at once so the labels track the handle,
+  // then commit it on the debounce.
+  const setPriceRange = (range: [number, number]): void => {
+    filters.value.priceRange = [range[0], range[1]];
+    commitFilters();
   };
 
-  const setPriceRange = (range: [number, number]) => {
-    filters.value.priceRange = range;
-    applyFiltersAndSort();
-    saveFilters();
+  const setSquareRange = (range: [number, number]): void => {
+    filters.value.squareRange = [range[0], range[1]];
+    commitFilters();
   };
 
-  const setSquareRange = (range: [number, number]) => {
-    filters.value.squareRange = range;
-    applyFiltersAndSort();
-    saveFilters();
-  };
-
-  const resetFilters = () => {
-    filters.value = {
-      rooms: [],
-      priceRange: [DEFAULT_PRICE_MIN, DEFAULT_PRICE_MAX],
-      squareRange: [DEFAULT_SQUARE_MIN, DEFAULT_SQUARE_MAX],
-    };
+  const resetFilters = (): void => {
+    filters.value = createDefaultFilters();
     sortBy.value = "default";
-    applyFiltersAndSort();
-    saveFilters();
-  };
-
-  const reset = () => {
-    allApartments.value = [];
-    displayedApartments.value = [];
-    filteredApartments.value = [];
-    currentPage.value = 1;
-    isLoading.value = false;
-    error.value = null;
-    sortBy.value = "default";
-    hasInitialized.value = false;
-    filters.value = {
-      rooms: [],
-      priceRange: [DEFAULT_PRICE_MIN, DEFAULT_PRICE_MAX],
-      squareRange: [DEFAULT_SQUARE_MIN, DEFAULT_SQUARE_MAX],
-    };
-    saveFilters();
+    commitNow();
   };
 
   return {
@@ -365,19 +271,17 @@ export const useApartmentsStore = defineStore("apartments", () => {
     filters,
     hasInitialized,
     hasMoreItems,
-    totalPages,
+    totalFloors,
     isEmpty,
     hasNoData,
     fetchApartments,
-    restorePersistedFilters,
     retryFetch,
-    resetRooms,
     loadMore,
+    findApartment,
     setSortBy,
-    setRoomsFilter,
+    toggleRoom,
     setPriceRange,
     setSquareRange,
     resetFilters,
-    reset,
   };
 });

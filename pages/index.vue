@@ -10,10 +10,7 @@ import ApartmentsTopFilter from "~/widgets/apartments-top-filter/ui/ApartmentsTo
 
 const apartmentsStore = useApartmentsStore();
 
-const resetFilters = (): void => {
-  apartmentsStore.resetFilters();
-  apartmentsStore.resetRooms();
-};
+useHead({ title: "Apartments" });
 
 const shouldShowList = computed(
   () =>
@@ -23,19 +20,13 @@ const shouldShowList = computed(
 );
 
 const shouldShowLoadMore = computed(
-  () =>
-    apartmentsStore.hasMoreItems && !apartmentsStore.isLoading
+  () => apartmentsStore.hasMoreItems && !apartmentsStore.isLoading
 );
 
-// Runs on the server during SSR and is skipped on hydration, so the first
-// paint already contains the list instead of an empty column
+// The store reads the saved filters from a cookie, which the server can see
+// too, so this runs once on the server with the visitor's filters already
+// applied and the first paint is the finished list.
 await callOnce("apartments", () => apartmentsStore.fetchApartments());
-
-// localStorage only exists on the client, so saved filters are applied
-// right after hydration
-onMounted(() => {
-  apartmentsStore.restorePersistedFilters();
-});
 </script>
 
 <template>
@@ -49,6 +40,7 @@ onMounted(() => {
         <ApartmentsList
           v-if="shouldShowList"
           :items="apartmentsStore.displayedApartments"
+          :total-floors="apartmentsStore.totalFloors"
         />
 
         <div v-if="apartmentsStore.isLoading" class="home__loading">
@@ -70,19 +62,26 @@ onMounted(() => {
         </div>
 
         <EmptyState
+          v-if="apartmentsStore.hasNoData && !apartmentsStore.error"
+          title="No apartments listed"
+          description="There is nothing in the catalogue at the moment."
+        />
+
+        <EmptyState
           v-if="apartmentsStore.isEmpty"
           title="No apartments found"
           description="No apartments match the selected filters. Try adjusting your search."
         >
           <template #action>
-            <Button @click="resetFilters"> Reset filters </Button>
+            <Button @click="apartmentsStore.resetFilters">
+              Reset filters
+            </Button>
           </template>
         </EmptyState>
 
         <Button
           v-if="shouldShowLoadMore"
           class="home__button"
-          :loading="apartmentsStore.isLoading"
           @click="apartmentsStore.loadMore"
         >
           Load more

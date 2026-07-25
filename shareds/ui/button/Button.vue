@@ -1,5 +1,5 @@
 <template>
-  <button :disabled="loading" class="button" @click="$emit('click')">
+  <button type="button" :disabled="loading" class="button" @click="$emit('click')">
     <slot></slot>
 
     <span v-if="loading" class="spinner"></span>
@@ -14,6 +14,11 @@ interface Props {
 withDefaults(defineProps<Props>(), {
   loading: false,
 });
+
+// Declared so that a parent's @click is consumed as a component event. Left
+// undeclared it also falls through to the root <button> as a native listener,
+// and every click runs the parent handler twice.
+defineEmits<{ click: [] }>();
 </script>
 
 <style lang="scss">

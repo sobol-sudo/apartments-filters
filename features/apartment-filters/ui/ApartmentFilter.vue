@@ -1,87 +1,48 @@
 <script setup lang="ts">
 import IconClose from "~/shareds/icons/IconClose.vue";
 import VueSlider from "vue-3-slider-component";
+import { useApartmentsStore } from "~/entities/apartment/model/store";
 import {
-  useApartmentsStore,
-  type RoomOption,
   DEFAULT_PRICE_MIN,
   DEFAULT_PRICE_MAX,
   DEFAULT_SQUARE_MIN,
   DEFAULT_SQUARE_MAX,
   PRICE_STEP,
-} from "~/entities/apartment/model/store";
-import { debounce } from "~/shareds/lib/debounce";
+  SQUARE_STEP,
+} from "~/entities/apartment/model/filters";
 
 const apartmentsStore = useApartmentsStore();
 const { filters, rooms } = storeToRefs(apartmentsStore);
 
-const DEBOUNCE_DELAY = 300;
-
-// Debounced store updates so dragging a slider does not refilter on every frame
-const debouncedPriceUpdate = debounce((newRange: [number, number]) => {
-  apartmentsStore.setPriceRange([newRange[0], newRange[1]]);
-}, DEBOUNCE_DELAY);
-
-const debouncedSquareUpdate = debounce((newRange: [number, number]) => {
-  apartmentsStore.setSquareRange([newRange[0], newRange[1]]);
-}, DEBOUNCE_DELAY);
-
-// Slider handlers: update the local range immediately, sync the store on a debounce
-const handlePriceChange =(newRange: [number, number]): void => {
-  filters.value.priceRange = newRange;
-  debouncedPriceUpdate(newRange);
+// Debouncing lives in the store, next to the state it commits, so that every
+// reset entry point cancels a queued slider update and not just this one.
+const handlePriceChange = (newRange: [number, number]): void => {
+  apartmentsStore.setPriceRange(newRange);
 };
 
 const handleSquareChange = (newRange: [number, number]): void => {
-  filters.value.squareRange = newRange;
-  debouncedSquareUpdate(newRange);
-};
-
-const handleRoomClick = (room: RoomOption): void => {
-  if (room.disabled) return;
-
-  room.active = !room.active;
-
-  rooms.value.forEach((roomOption) => {
-    if (roomOption.value !== room.value) {
-      roomOption.active = false;
-    }
-  });
-
-  // Push the current selection to the store
-  const activeRooms = rooms.value
-    .filter((roomOption) => roomOption.active)
-    .map((roomOption) => roomOption.value);
-  apartmentsStore.setRoomsFilter(activeRooms);
-};
-
-const handleReset = (): void => {
-  // A slider update queued moments ago would otherwise land after the reset
-  // and write the stale range back to the store and to localStorage
-  debouncedPriceUpdate.cancel();
-  debouncedSquareUpdate.cancel();
-
-  apartmentsStore.resetRooms();
-  apartmentsStore.resetFilters();
+  apartmentsStore.setSquareRange(newRange);
 };
 </script>
 
 <template>
   <div class="apartments-side-filter">
     <div class="apartments-side-filter__rooms">
-      <div
+      <button
         v-for="room in rooms"
         :key="room.value"
+        type="button"
         class="apartments-side-filter__room"
-        :class="{ active: room.active, disabled: room.disabled }"
-        @click="handleRoomClick(room)"
+        :class="{ active: room.active }"
+        :aria-pressed="room.active"
+        @click="apartmentsStore.toggleRoom(room.value)"
       >
         <span>{{ room.name }}</span>
-      </div>
+      </button>
     </div>
 
     <div class="apartments-side-filter__price">
-      <p class="title">Price, ₽</p>
+      <p id="price-range-label" class="title">Price, ₽</p>
 
       <div class="description">
         <p>
@@ -95,16 +56,18 @@ const handleReset = (): void => {
       <div class="range">
         <VueSlider
           :model-value="filters.priceRange"
-          @update:model-value="handlePriceChange"
           :min="DEFAULT_PRICE_MIN"
           :max="DEFAULT_PRICE_MAX"
-          :step="PRICE_STEP"
+          :interval="PRICE_STEP"
+          use-keyboard
+          aria-labelledby="price-range-label"
+          @update:model-value="handlePriceChange"
         />
       </div>
     </div>
 
     <div class="apartments-side-filter__square">
-      <p class="title">Area, m²</p>
+      <p id="square-range-label" class="title">Area, m²</p>
 
       <div class="description">
         <p>
@@ -118,19 +81,25 @@ const handleReset = (): void => {
       <div class="range">
         <VueSlider
           :model-value="filters.squareRange"
-          @update:model-value="handleSquareChange"
           :min="DEFAULT_SQUARE_MIN"
           :max="DEFAULT_SQUARE_MAX"
-          :step="1"
+          :interval="SQUARE_STEP"
+          use-keyboard
+          aria-labelledby="square-range-label"
+          @update:model-value="handleSquareChange"
         />
       </div>
     </div>
 
-    <div class="apartments-side-filter__reset" @click="handleReset">
+    <button
+      type="button"
+      class="apartments-side-filter__reset"
+      @click="apartmentsStore.resetFilters"
+    >
       Reset filters
 
       <IconClose />
-    </div>
+    </button>
   </div>
 </template>
 
@@ -160,6 +129,9 @@ const handleReset = (): void => {
     align-items: center;
     font: $text-p2-regular;
     user-select: none;
+    background: none;
+    border: none;
+    color: inherit;
 
     @media screen and ($media-tablet) {
       font-size: 13px;
@@ -185,6 +157,9 @@ const handleReset = (): void => {
     align-items: center;
     transition: $transition-base;
     user-select: none;
+    border: none;
+    font: inherit;
+    color: inherit;
 
     &:hover {
       opacity: 0.6;
@@ -195,15 +170,6 @@ const handleReset = (): void => {
       box-shadow: 0px 6px 20px 0px rgba(149, 208, 161, 1);
       background-color: $color-main-dark;
       color: rgba(255, 255, 255, 1);
-    }
-
-    &.disabled {
-      color: $color-main-font-medium;
-      cursor: not-allowed;
-
-      &:hover {
-        opacity: 1;
-      }
     }
   }
 

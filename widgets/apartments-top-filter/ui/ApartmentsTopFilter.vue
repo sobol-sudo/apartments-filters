@@ -1,20 +1,18 @@
 <script setup lang="ts">
 import IconArrowUp from "~/shareds/icons/IconArrowUp.vue";
 import IconArrowDown from "~/shareds/icons/IconArrowDown.vue";
-import {
-  useApartmentsStore,
-  type SortOption,
-} from "~/entities/apartment/model/store";
+import { useApartmentsStore } from "~/entities/apartment/model/store";
+import type { SortOption } from "~/entities/apartment/model/filters";
 
 const apartmentsStore = useApartmentsStore();
 
-type SortField = "square" | "floor" | "price";
+type SortField = "rooms" | "square" | "floor" | "price";
 
 const handleSort = (field: SortField): void => {
   const currentSort = apartmentsStore.sortBy;
   const ascSort = `${field}_asc` as SortOption;
   const descSort = `${field}_desc` as SortOption;
-  
+
   let newSort: SortOption;
 
   // Sorting cycles through: asc -> desc -> default -> asc
@@ -31,18 +29,45 @@ const handleSort = (field: SortField): void => {
 
   apartmentsStore.setSortBy(newSort);
 };
+
+// Screen readers get the column's current sort state instead of a bare label
+const sortState = (field: SortField): "ascending" | "descending" | "none" => {
+  if (apartmentsStore.sortBy === `${field}_asc`) return "ascending";
+  if (apartmentsStore.sortBy === `${field}_desc`) return "descending";
+  return "none";
+};
 </script>
 
 <template>
   <div class="apartments-top-filter">
-    <div class="apartments-top-filter__layout">Floor plan</div>
+    <span class="apartments-top-filter__layout">Floor plan</span>
 
-    <div class="apartments-top-filter__room">Apartment</div>
+    <button
+      type="button"
+      class="apartments-top-filter__room"
+      :aria-label="`Sort by apartment, currently ${sortState('rooms')}`"
+      @click="handleSort('rooms')"
+    >
+      Apartment
 
-    <div class="apartments-top-filter__square" @click="handleSort('square')">
+      <span class="apartments-top-filter__control">
+        <IconArrowUp :class="{ active: apartmentsStore.sortBy === 'rooms_asc' }" />
+
+        <IconArrowDown
+          :class="{ active: apartmentsStore.sortBy === 'rooms_desc' }"
+        />
+      </span>
+    </button>
+
+    <button
+      type="button"
+      class="apartments-top-filter__square"
+      :aria-label="`Sort by area, currently ${sortState('square')}`"
+      @click="handleSort('square')"
+    >
       S, m²
 
-      <div class="apartments-top-filter__control">
+      <span class="apartments-top-filter__control">
         <IconArrowUp
           :class="{ active: apartmentsStore.sortBy === 'square_asc' }"
         />
@@ -50,36 +75,42 @@ const handleSort = (field: SortField): void => {
         <IconArrowDown
           :class="{ active: apartmentsStore.sortBy === 'square_desc' }"
         />
-      </div>
-    </div>
+      </span>
+    </button>
 
-    <div class="apartments-top-filter__floor" @click="handleSort('floor')">
+    <button
+      type="button"
+      class="apartments-top-filter__floor"
+      :aria-label="`Sort by floor, currently ${sortState('floor')}`"
+      @click="handleSort('floor')"
+    >
       Floor
 
-      <div class="apartments-top-filter__control">
-        <IconArrowUp
-          :class="{ active: apartmentsStore.sortBy === 'floor_asc' }"
-        />
+      <span class="apartments-top-filter__control">
+        <IconArrowUp :class="{ active: apartmentsStore.sortBy === 'floor_asc' }" />
 
         <IconArrowDown
           :class="{ active: apartmentsStore.sortBy === 'floor_desc' }"
         />
-      </div>
-    </div>
+      </span>
+    </button>
 
-    <div class="apartments-top-filter__price" @click="handleSort('price')">
+    <button
+      type="button"
+      class="apartments-top-filter__price"
+      :aria-label="`Sort by price, currently ${sortState('price')}`"
+      @click="handleSort('price')"
+    >
       Price, ₽
 
-      <div class="apartments-top-filter__control">
-        <IconArrowUp
-          :class="{ active: apartmentsStore.sortBy === 'price_asc' }"
-        />
+      <span class="apartments-top-filter__control">
+        <IconArrowUp :class="{ active: apartmentsStore.sortBy === 'price_asc' }" />
 
         <IconArrowDown
           :class="{ active: apartmentsStore.sortBy === 'price_desc' }"
         />
-      </div>
-    </div>
+      </span>
+    </button>
   </div>
 </template>
 
@@ -95,6 +126,15 @@ const handleSort = (field: SortField): void => {
   @media screen and ($media-tablet) {
     box-shadow: none;
     padding-bottom: 12px;
+  }
+
+  button {
+    background: none;
+    border: none;
+    padding: 0;
+    font: inherit;
+    color: inherit;
+    text-align: left;
   }
 
   &__control {
@@ -126,6 +166,15 @@ const handleSort = (field: SortField): void => {
   &__room {
     max-width: 281px;
     width: 100%;
+    display: flex;
+    cursor: pointer;
+    transition: $transition-base;
+    gap: 8px;
+    align-items: center;
+
+    &:hover {
+      opacity: 0.6;
+    }
 
     @media screen and ($media-tablet) {
       display: none;

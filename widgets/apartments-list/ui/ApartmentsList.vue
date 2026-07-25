@@ -2,26 +2,29 @@
 import { type apartmentsItem } from "~/entities/apartment/types";
 import { getImage } from "~/shareds/lib/get-image";
 
-const TOTAL_FLOORS = 17;
+withDefaults(
+  defineProps<{
+    items: apartmentsItem[];
+    // Taken from the catalogue rather than hard-coded, so the "of N" never
+    // claims floors the data does not contain. 0 hides it entirely.
+    totalFloors?: number;
+  }>(),
+  { totalFloors: 0 }
+);
 
-const props = defineProps<{
-  items: apartmentsItem[];
-}>();
-
-const formatNumber = (value: number): string => {
-  return value.toLocaleString("en-US");
-};
+const formatNumber = (value: number): string => value.toLocaleString("en-US");
 </script>
 
 <template>
   <div class="apartments-list">
-    <div
+    <NuxtLink
       v-for="item in items"
       :key="item.id"
+      :to="`/apartments/${item.id}`"
       class="apartments-item"
     >
       <div class="apartments-item__image">
-        <img :src="getImage(item.image)" alt="item.title" />
+        <img :src="getImage(item.image)" :alt="item.title" />
       </div>
 
       <div class="apartments-item__content">
@@ -37,7 +40,7 @@ const formatNumber = (value: number): string => {
           {{ item.floor }}
 
           <span>
-            of {{ TOTAL_FLOORS }}
+            <template v-if="totalFloors">of {{ totalFloors }}</template>
 
             <sub>floor</sub>
           </span>
@@ -49,7 +52,7 @@ const formatNumber = (value: number): string => {
           <span>₽</span>
         </p>
       </div>
-    </div>
+    </NuxtLink>
   </div>
 </template>
 
@@ -73,6 +76,8 @@ const formatNumber = (value: number): string => {
   max-height: 120px;
   cursor: pointer;
   transition: $transition-base;
+  color: inherit;
+  text-decoration: none;
 
   &:hover {
     box-shadow: 0px 1px 0px 0px rgba(0, 0, 0, 0.6);
