@@ -38,7 +38,7 @@ onUnmounted(() => {
       v-if="isVisible"
       class="scroll-to-top"
       @click="scrollToTop"
-      aria-label="Прокрутить наверх"
+      aria-label="Scroll to top"
     >
       <svg
         width="10"
