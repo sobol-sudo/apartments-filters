@@ -17,7 +17,7 @@ const { filters, rooms } = storeToRefs(apartmentsStore);
 
 const DEBOUNCE_DELAY = 300;
 
-// Debounced функции для обновления фильтров
+// Debounced store updates so dragging a slider does not refilter on every frame
 const debouncedPriceUpdate = debounce((newRange: [number, number]) => {
   apartmentsStore.setPriceRange([newRange[0], newRange[1]]);
 }, DEBOUNCE_DELAY);
@@ -26,8 +26,8 @@ const debouncedSquareUpdate = debounce((newRange: [number, number]) => {
   apartmentsStore.setSquareRange([newRange[0], newRange[1]]);
 }, DEBOUNCE_DELAY);
 
-// Обработчики изменения слайдеров
-const handlePriceChange = (newRange: [number, number]): void => {
+// Slider handlers: update the local range immediately, sync the store on a debounce
+const handlePriceChange =(newRange: [number, number]): void => {
   filters.value.priceRange = newRange;
   debouncedPriceUpdate(newRange);
 };
@@ -48,7 +48,7 @@ const handleRoomClick = (room: RoomOption): void => {
     }
   });
 
-  // Обновляем фильтр в store
+  // Push the current selection to the store
   const activeRooms = rooms.value
     .filter((roomOption) => roomOption.active)
     .map((roomOption) => roomOption.value);
@@ -76,14 +76,14 @@ const handleReset = (): void => {
     </div>
 
     <div class="apartments-side-filter__price">
-      <p class="title">Стоимость квартиры, ₽</p>
+      <p class="title">Price, ₽</p>
 
       <div class="description">
         <p>
-          от <b>{{ filters.priceRange[0].toLocaleString("ru-RU") }}</b>
+          from <b>{{ filters.priceRange[0].toLocaleString("en-US") }}</b>
         </p>
         <p>
-          до <b>{{ filters.priceRange[1].toLocaleString("ru-RU") }}</b>
+          to <b>{{ filters.priceRange[1].toLocaleString("en-US") }}</b>
         </p>
       </div>
 
@@ -99,14 +99,14 @@ const handleReset = (): void => {
     </div>
 
     <div class="apartments-side-filter__square">
-      <p class="title">Площадь квартиры, м²</p>
+      <p class="title">Area, m²</p>
 
       <div class="description">
         <p>
-          от <b>{{ filters.squareRange[0] }}</b>
+          from <b>{{ filters.squareRange[0] }}</b>
         </p>
         <p>
-          до <b>{{ filters.squareRange[1] }}</b>
+          to <b>{{ filters.squareRange[1] }}</b>
         </p>
       </div>
 
@@ -122,7 +122,7 @@ const handleReset = (): void => {
     </div>
 
     <div class="apartments-side-filter__reset" @click="handleReset">
-      Сбросить параметры
+      Reset filters
 
       <IconClose />
     </div>
