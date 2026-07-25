@@ -4,7 +4,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 1,
     image: "images/item_1.png",
-    title: "1-комнатная №101",
+    title: "1-bedroom, unit 101",
     price: 5800000,
     floor: 1,
     square: 35.5,
@@ -12,7 +12,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 2,
     image: "images/item_1.png",
-    title: "2-комнатная №102",
+    title: "2-bedroom, unit 102",
     price: 7200000,
     floor: 2,
     square: 48.3,
@@ -20,7 +20,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 3,
     image: "images/item_1.png",
-    title: "3-комнатная №104",
+    title: "3-bedroom, unit 104",
     price: 6630500,
     floor: 1,
     square: 63.1,
@@ -28,7 +28,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 4,
     image: "images/item_1.png",
-    title: "1-комнатная №201",
+    title: "1-bedroom, unit 201",
     price: 6100000,
     floor: 3,
     square: 38.7,
@@ -36,7 +36,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 5,
     image: "images/item_1.png",
-    title: "3-комнатная №105",
+    title: "3-bedroom, unit 105",
     price: 6650759,
     floor: 2,
     square: 63.2,
@@ -44,7 +44,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 6,
     image: "images/item_1.png",
-    title: "2-комнатная №203",
+    title: "2-bedroom, unit 203",
     price: 8900000,
     floor: 4,
     square: 52.1,
@@ -52,7 +52,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 7,
     image: "images/item_1.png",
-    title: "3-комнатная №106",
+    title: "3-bedroom, unit 106",
     price: 6650759,
     floor: 3,
     square: 63.2,
@@ -60,7 +60,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 8,
     image: "images/item_1.png",
-    title: "1-комнатная №301",
+    title: "1-bedroom, unit 301",
     price: 5900000,
     floor: 5,
     square: 36.8,
@@ -68,7 +68,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 9,
     image: "images/item_1.png",
-    title: "2-комнатная №302",
+    title: "2-bedroom, unit 302",
     price: 8200000,
     floor: 6,
     square: 49.5,
@@ -76,7 +76,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 10,
     image: "images/item_1.png",
-    title: "3-комнатная №107",
+    title: "3-bedroom, unit 107",
     price: 6671314,
     floor: 4,
     square: 63.6,
@@ -84,7 +84,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 11,
     image: "images/item_1.png",
-    title: "1-комнатная №401",
+    title: "1-bedroom, unit 401",
     price: 6200000,
     floor: 7,
     square: 40.2,
@@ -92,7 +92,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 12,
     image: "images/item_1.png",
-    title: "2-комнатная №402",
+    title: "2-bedroom, unit 402",
     price: 9100000,
     floor: 8,
     square: 55.3,
@@ -100,7 +100,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 13,
     image: "images/item_1.png",
-    title: "3-комнатная №108",
+    title: "3-bedroom, unit 108",
     price: 6679554,
     floor: 5,
     square: 63.1,
@@ -108,7 +108,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 14,
     image: "images/item_1.png",
-    title: "1-комнатная №501",
+    title: "1-bedroom, unit 501",
     price: 6300000,
     floor: 9,
     square: 42.1,
@@ -116,7 +116,7 @@ export const apartmentsItems: apartmentsItem[] = [
   {
     id: 15,
     image: "images/item_1.png",
-    title: "2-комнатная №502",
+    title: "2-bedroom, unit 502",
     price: 9500000,
     floor: 10,
     square: 58.7,
