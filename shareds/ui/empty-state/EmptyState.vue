@@ -13,10 +13,10 @@ defineProps<Props>();
             <svg width="64" height="64" viewBox="0 0 64 64" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <circle cx="32" cy="32" r="30" stroke="currentColor" stroke-width="2" stroke-dasharray="4 4"
                     opacity="0.3" />
-                <!-- вертикальная линия -->
+                <!-- vertical line -->
                 <line x1="32" y1="24" x2="32" y2="40" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                     opacity="0.5" />
-                <!-- горизонтальная линия -->
+                <!-- horizontal line -->
                 <line x1="24" y1="32" x2="40" y2="32" stroke="currentColor" stroke-width="2" stroke-linecap="round"
                     opacity="0.5" />
             </svg>
