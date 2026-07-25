@@ -36,7 +36,7 @@ onMounted(() => {
   <div class="home">
     <div class="home__container">
       <div class="home__content">
-        <h1>Квартиры</h1>
+        <h1>Apartments</h1>
 
         <ApartmentsTopFilter />
 
@@ -51,16 +51,16 @@ onMounted(() => {
 
         <div v-if="apartmentsStore.error" class="home__error">
           <IconError />
-          <p>Произошла ошибка при загрузке квартир</p>
+          <p>Something went wrong while loading apartments</p>
         </div>
 
         <EmptyState
           v-if="apartmentsStore.isEmpty"
-          title="Ничего не найдено"
-          description="По заданным фильтрам квартиры не найдены. Попробуйте изменить параметры поиска."
+          title="No apartments found"
+          description="No apartments match the selected filters. Try adjusting your search."
         >
           <template #action>
-            <Button @click="resetFilters"> Сбросить фильтры </Button>
+            <Button @click="resetFilters"> Reset filters </Button>
           </template>
         </EmptyState>
 
@@ -70,7 +70,7 @@ onMounted(() => {
           :loading="apartmentsStore.isLoading"
           @click="apartmentsStore.loadMore"
         >
-          Загрузить еще
+          Load more
         </Button>
       </div>
 
