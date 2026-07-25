@@ -23,7 +23,7 @@ export interface RoomOption {
   disabled: boolean;
 }
 
-// Константы для фильтров
+// Filter defaults
 export const DEFAULT_PRICE_MIN = 5500000;
 export const DEFAULT_PRICE_MAX = 18900000;
 export const DEFAULT_SQUARE_MIN = 33;
@@ -33,9 +33,9 @@ const ITEMS_PER_PAGE = 5;
 const LOAD_MORE_DELAY = 1000;
 const FILTERS_STORAGE_KEY = "apartments-filters";
 
-// Утилита для извлечения количества комнат из title
+// Pulls the bedroom count out of an apartment title, e.g. "2-bedroom, unit 102" -> 2
 export const extractRoomsCount = (title: string): number => {
-  const match = title.match(/(\d+)-комнатная/);
+  const match = title.match(/(\d+)-bedroom/);
   return match ? parseInt(match[1], 10) : 0;
 };
 
@@ -52,25 +52,25 @@ export const useApartmentsStore = defineStore("apartments", () => {
 
   const rooms = reactive<RoomOption[]>([
     {
-      name: "1к",
+      name: "1BR",
       value: 1,
       active: false,
       disabled: false,
     },
     {
-      name: "2к",
+      name: "2BR",
       value: 2,
       active: true,
       disabled: false,
     },
     {
-      name: "3к",
+      name: "3BR",
       value: 3,
       active: false,
       disabled: false,
     },
     {
-      name: "4к",
+      name: "4BR",
       value: 4,
       active: false,
       disabled: true,
@@ -95,7 +95,7 @@ export const useApartmentsStore = defineStore("apartments", () => {
           room.active = filters.value.rooms.includes(room.value);
         });
       } catch (e) {
-        console.warn("Ошибка восстановления фильтров:", e);
+        console.warn("Failed to restore saved filters:", e);
       }
     }
   };
@@ -121,7 +121,7 @@ export const useApartmentsStore = defineStore("apartments", () => {
     return !isLoading.value && allApartments.value.length === 0;
   });
 
-  // Автосохранение фильтров при изменении
+  // Persist the current filters and sort order so they survive a page reload
   const saveFilters = () => {
     localStorage.setItem(
       FILTERS_STORAGE_KEY,
@@ -144,7 +144,7 @@ export const useApartmentsStore = defineStore("apartments", () => {
 
   const filterApartments = (apartments: apartmentsItem[]): apartmentsItem[] => {
     return apartments.filter((apartment) => {
-      // Фильтр по количеству комнат
+      // Bedrooms
       if (filters.value.rooms.length > 0) {
         const roomsCount = extractRoomsCount(apartment.title);
         if (!filters.value.rooms.includes(roomsCount)) {
@@ -152,13 +152,13 @@ export const useApartmentsStore = defineStore("apartments", () => {
         }
       }
 
-      // Фильтр по цене
+      // Price
       const [priceMin, priceMax] = filters.value.priceRange;
       if (apartment.price < priceMin || apartment.price > priceMax) {
         return false;
       }
 
-      // Фильтр по площади
+      // Area
       const [squareMin, squareMax] = filters.value.squareRange;
       if (apartment.square < squareMin || apartment.square > squareMax) {
         return false;
@@ -229,7 +229,7 @@ export const useApartmentsStore = defineStore("apartments", () => {
         endIndex
       );
     } catch (err) {
-      console.error("Ошибка при загрузке дополнительных квартир:", err);
+      console.error("Failed to load more apartments:", err);
       error.value = err as Error;
     } finally {
       isLoading.value = false;
