@@ -56,6 +56,11 @@ const handleRoomClick = (room: RoomOption): void => {
 };
 
 const handleReset = (): void => {
+  // A slider update queued moments ago would otherwise land after the reset
+  // and write the stale range back to the store and to localStorage
+  debouncedPriceUpdate.cancel();
+  debouncedSquareUpdate.cancel();
+
   apartmentsStore.resetRooms();
   apartmentsStore.resetFilters();
 };

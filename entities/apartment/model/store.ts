@@ -1,14 +1,18 @@
 import type { apartmentsItem } from "../types";
 import { getApartments } from "../api";
+import { safeStorage } from "~/shareds/lib/safe-storage";
 
-export type SortOption =
-  | "price_asc"
-  | "price_desc"
-  | "square_asc"
-  | "square_desc"
-  | "floor_asc"
-  | "floor_desc"
-  | "default";
+export const SORT_OPTIONS = [
+  "default",
+  "price_asc",
+  "price_desc",
+  "square_asc",
+  "square_desc",
+  "floor_asc",
+  "floor_desc",
+] as const;
+
+export type SortOption = (typeof SORT_OPTIONS)[number];
 
 export interface FilterState {
   rooms: number[];
@@ -39,6 +43,32 @@ export const extractRoomsCount = (title: string): number => {
   return match ? parseInt(match[1], 10) : 0;
 };
 
+const isNumericRange = (value: unknown): value is [number, number] =>
+  Array.isArray(value) &&
+  value.length === 2 &&
+  value.every((entry) => typeof entry === "number" && Number.isFinite(entry));
+
+// Persisted state comes from localStorage, which anyone can edit by hand,
+// so validate its shape before letting it into the store
+const isFilterState = (value: unknown): value is FilterState => {
+  if (typeof value !== "object" || value === null) return false;
+
+  const candidate = value as Partial<FilterState>;
+
+  return (
+    Array.isArray(candidate.rooms) &&
+    candidate.rooms.every((room) => typeof room === "number") &&
+    isNumericRange(candidate.priceRange) &&
+    isNumericRange(candidate.squareRange)
+  );
+};
+
+const isSortOption = (value: unknown): value is SortOption =>
+  SORT_OPTIONS.includes(value as SortOption);
+
+const toErrorMessage = (err: unknown): string =>
+  err instanceof Error ? err.message : String(err);
+
 export const useApartmentsStore = defineStore("apartments", () => {
   const allApartments = ref<apartmentsItem[]>([]);
   const displayedApartments = ref<apartmentsItem[]>([]);
@@ -46,7 +76,9 @@ export const useApartmentsStore = defineStore("apartments", () => {
   const currentPage = ref(1);
   const itemsPerPage = ref(ITEMS_PER_PAGE);
   const isLoading = ref(false);
-  const error = ref<Error | null>(null);
+  // Kept as a plain string: an Error instance cannot be serialized into the
+  // Nuxt payload, which would turn a failed server-side fetch into a 500
+  const error = ref<string | null>(null);
   const sortBy = ref<SortOption>("default");
   const hasInitialized = ref(false);
 
@@ -60,7 +92,7 @@ export const useApartmentsStore = defineStore("apartments", () => {
     {
       name: "2BR",
       value: 2,
-      active: true,
+      active: false,
       disabled: false,
     },
     {
@@ -84,20 +116,27 @@ export const useApartmentsStore = defineStore("apartments", () => {
   });
 
   const initPersistedState = (): void => {
-    const saved = localStorage.getItem(FILTERS_STORAGE_KEY);
+    const saved = safeStorage.getItem(FILTERS_STORAGE_KEY);
+
     if (saved) {
       try {
         const parsed = JSON.parse(saved);
-        filters.value = parsed.filters ?? filters.value;
-        sortBy.value = parsed.sortBy ?? "default";
 
-        rooms.forEach((room) => {
-          room.active = filters.value.rooms.includes(room.value);
-        });
+        if (isFilterState(parsed?.filters)) {
+          filters.value = parsed.filters;
+        }
+
+        sortBy.value = isSortOption(parsed?.sortBy) ? parsed.sortBy : "default";
       } catch (e) {
         console.warn("Failed to restore saved filters:", e);
       }
     }
+
+    // Chip state is always derived from the filters, restored or default, so a
+    // first-time visitor never sees a highlighted chip with no filter applied
+    rooms.forEach((room) => {
+      room.active = filters.value.rooms.includes(room.value);
+    });
   };
 
   const hasMoreItems = computed(() => {
@@ -123,7 +162,7 @@ export const useApartmentsStore = defineStore("apartments", () => {
 
   // Persist the current filters and sort order so they survive a page reload
   const saveFilters = () => {
-    localStorage.setItem(
+    safeStorage.setItem(
       FILTERS_STORAGE_KEY,
       JSON.stringify({ filters: filters.value, sortBy: sortBy.value })
     );
@@ -202,14 +241,35 @@ export const useApartmentsStore = defineStore("apartments", () => {
       const data = await getApartments();
       allApartments.value = data;
       hasInitialized.value = true;
-      initPersistedState();
       applyFiltersAndSort();
     } catch (err) {
-      error.value = err as Error;
+      error.value = toErrorMessage(err);
       console.error("Error fetching apartments:", err);
     } finally {
       isLoading.value = false;
     }
+  };
+
+  // Runs on the client only. The server has no localStorage, so it renders the
+  // full, unfiltered list and the saved selection is re-applied after hydration.
+  const restorePersistedFilters = (): void => {
+    initPersistedState();
+    applyFiltersAndSort();
+  };
+
+  // Clears the error so the error block can disappear. Data that already
+  // arrived is kept; only a genuinely empty store is refetched.
+  const retryFetch = async (): Promise<void> => {
+    if (isLoading.value) return;
+
+    error.value = null;
+
+    if (allApartments.value.length > 0) {
+      applyFiltersAndSort();
+      return;
+    }
+
+    await fetchApartments();
   };
 
   const loadMore = async (): Promise<void> => {
@@ -230,7 +290,7 @@ export const useApartmentsStore = defineStore("apartments", () => {
       );
     } catch (err) {
       console.error("Failed to load more apartments:", err);
-      error.value = err as Error;
+      error.value = toErrorMessage(err);
     } finally {
       isLoading.value = false;
     }
@@ -309,6 +369,8 @@ export const useApartmentsStore = defineStore("apartments", () => {
     isEmpty,
     hasNoData,
     fetchApartments,
+    restorePersistedFilters,
+    retryFetch,
     resetRooms,
     loadMore,
     setSortBy,

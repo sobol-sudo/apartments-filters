@@ -27,8 +27,14 @@ const shouldShowLoadMore = computed(
     apartmentsStore.hasMoreItems && !apartmentsStore.isLoading
 );
 
+// Runs on the server during SSR and is skipped on hydration, so the first
+// paint already contains the list instead of an empty column
+await callOnce("apartments", () => apartmentsStore.fetchApartments());
+
+// localStorage only exists on the client, so saved filters are applied
+// right after hydration
 onMounted(() => {
-  apartmentsStore.fetchApartments();
+  apartmentsStore.restorePersistedFilters();
 });
 </script>
 
@@ -50,8 +56,17 @@ onMounted(() => {
         </div>
 
         <div v-if="apartmentsStore.error" class="home__error">
-          <IconError />
-          <p>Something went wrong while loading apartments</p>
+          <div class="home__error-message">
+            <IconError />
+            <p>Something went wrong while loading apartments</p>
+          </div>
+
+          <Button
+            :loading="apartmentsStore.isLoading"
+            @click="apartmentsStore.retryFetch"
+          >
+            Try again
+          </Button>
         </div>
 
         <EmptyState
@@ -122,9 +137,17 @@ onMounted(() => {
   &__error {
     width: 100%;
     display: flex;
+    flex-direction: column;
     align-items: center;
     justify-content: center;
+    gap: 16px;
     padding: 48px 0;
+  }
+
+  &__error-message {
+    display: flex;
+    align-items: center;
+    gap: 8px;
   }
 }
 
