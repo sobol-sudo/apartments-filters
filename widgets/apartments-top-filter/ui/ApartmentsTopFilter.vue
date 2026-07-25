@@ -17,7 +17,7 @@ const handleSort = (field: SortField): void => {
   
   let newSort: SortOption;
 
-  // Логика переключения сортировки: asc -> desc -> default -> asc
+  // Sorting cycles through: asc -> desc -> default -> asc
   switch (currentSort) {
     case ascSort:
       newSort = descSort;
@@ -35,12 +35,12 @@ const handleSort = (field: SortField): void => {
 
 <template>
   <div class="apartments-top-filter">
-    <div class="apartments-top-filter__layout">Планировка</div>
+    <div class="apartments-top-filter__layout">Floor plan</div>
 
-    <div class="apartments-top-filter__room">Квартира</div>
+    <div class="apartments-top-filter__room">Apartment</div>
 
     <div class="apartments-top-filter__square" @click="handleSort('square')">
-      S, м²
+      S, m²
 
       <div class="apartments-top-filter__control">
         <IconArrowUp
@@ -54,7 +54,7 @@ const handleSort = (field: SortField): void => {
     </div>
 
     <div class="apartments-top-filter__floor" @click="handleSort('floor')">
-      Этаж
+      Floor
 
       <div class="apartments-top-filter__control">
         <IconArrowUp
@@ -68,7 +68,7 @@ const handleSort = (field: SortField): void => {
     </div>
 
     <div class="apartments-top-filter__price" @click="handleSort('price')">
-      Цена, ₽
+      Price, ₽
 
       <div class="apartments-top-filter__control">
         <IconArrowUp
