@@ -42,7 +42,7 @@ const formatNumber = (value: number): string => value.toLocaleString("en-US");
           <span>
             <template v-if="totalFloors">of {{ totalFloors }}</template>
 
-            <sub>floor</sub>
+            <sub>{{ totalFloors ? 'floors' : 'floor' }}</sub>
           </span>
         </p>
 
